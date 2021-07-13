@@ -1,0 +1,736 @@
+#!/bin/bash
+
+# This feature on Category5 Technology TV sponsored by ameriDroid.com
+# USA-based SBC sales with unmatched support and fast shipping
+# Get a Raspberry Pi 4 from https://ameridroid.com
+
+# This Facial Recognition installer was initially based on this fantastic tutorial by By Caroline Dunn:
+# https://www.tomshardware.com/how-to/raspberry-pi-facial-recognition
+
+echo "This tool has not yet been completed or released"
+exit
+
+thistool="Facial Recognition"
+thisver="1.0"
+
+if [[ $EUID -ne 0 ]]; then
+  echo "ERROR: This script must be run as root" 2>&1
+  exit 1
+fi
+
+# Get the LAN IP address
+
+  # test the route based on $host and treat that as the interface
+  interface=""
+  host=github.com
+  host_ip=$(getent ahosts "$host" | awk '{print $1; exit}')
+  interface=`ip route get "$host_ip" | grep -Po '(?<=(dev )).*(?= src| proto)' | cut -f 1 -d " "`
+  ip=$(/sbin/ip -f inet addr show $interface | grep -Po 'inet \K[\d.]+' | head -n 1)
+  if [[ $ip == "" ]]; then
+    # Never reply with a blank string - instead, use localhost if no IP is found
+    # This would be the case if no network connection is non-existent
+    ip="127.0.0.1"
+  fi
+
+# Version comparison which allows comparing 1.16.5 to 1.14.0 (for example)
+function version { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
+
+# Prevent running multiple apt updates
+updated=0
+
+# Place the current folder in a variable to use as a base source folder
+base=$(pwd)
+
+# dialog allows me to create a pretty installer
+# It is a required dependency since Pinecraft 1.1
+dialog=$(which dialog)
+if [[ $dialog == "" ]]; then
+  printf "Installing dialog... "
+  if [[ $updated == 0 ]]; then
+    apt-get update > /dev/null 2>&1
+    updated=1
+  fi
+  apt-get -y install dialog > /dev/null 2>&1
+  dialog=$(which dialog)
+  if [[ $dialog == "" ]]; then
+    echo "Failed. Aborting. Install dialog first."
+    exit 0
+  else
+    echo "Success."
+  fi
+fi
+
+
+dialog --title "$thistool $thisver" \
+--msgbox "
+ RPi-Projects from Category5 Technology TV
+        === Facial Recognition ===
+             For Raspberry Pi
+
+    By Robbie Ferguson // The Bald Nerd
+           https://category5.tv/
+
+         Installer Version: $thisver
+
+         Sponsored by ameriDroid
+         https://ameridroid.com/
+" 17 48
+
+
+if [[ $updated == 0 ]]; then
+  dialog --infobox "Updating repositories..." 3 34 ;
+  apt-get update > /dev/null 2>&1
+  updated=1
+fi
+
+
+# Username may optionally be provided on CLI
+user=$1
+
+if [[ $user == "" ]]; then
+  validuser=""
+else
+  validuser=$(getent passwd $user)
+fi
+while [[ $validuser == "" ]]
+do
+
+  users=$(cat /etc/passwd | grep '/home' | cut -d: -f1)
+  count=1
+  declare -a usersarr=()
+  for username in $users; do
+    if [[ -d /home/${username}/ ]]; then
+      usersarr+=("${username}" "/home/${username}/Documents/facial-recognition")
+    fi
+  done
+
+  exec 3>&1
+  user=$(dialog --title "Linux User" --menu "Linux User:" 20 60 10 "${usersarr[@]}" 2>&1 1>&3);
+
+  case $? in
+  0)
+   if [[ $user == "" ]]; then
+    validuser=""
+   else
+    validuser=$(getent passwd $user)
+   fi
+   if [[ $validuser == "" ]]; then
+     dialog --title "Error" \
+       --msgbox "\n $user does not exist." 6 50
+   fi
+   ;;
+  1)
+   echo
+   echo
+   echo "Aborted."
+   echo
+   exit 1 ;;
+  esac
+
+done
+
+
+for pkg in $(grep -vE "^\s*#" packages.base | tr "\n" " ")
+do
+  if [ $(dpkg-query -W -f='${Status}' $pkg 2>/dev/null | grep -c "ok installed") -eq 0 ]; then
+    dialog --infobox "Installing ${pkg}..." 3 38 ;
+  #  apt-get -y install $pkg
+    if [ $(dpkg-query -W -f='${Status}' $pkg 2>/dev/null | grep -c "ok installed") -eq 0 ]; then
+      # It still isn't showing as installed after attempting, so try again
+      sleep 15
+  #    apt-get -y install $pkg
+    fi
+    if [ $(dpkg-query -W -f='${Status}' $pkg 2>/dev/null | grep -c "ok installed") -eq 0 ]; then
+      dialog --infobox "Failed to install ${pkg}" 3 38 ;
+      sleep 3
+    else
+      dialog --infobox "${pkg} Installed..." 3 38 ;
+      sleep 3
+    fi
+  fi
+done
+
+
+
+exit
+
+instdir="/home/$user/Documents/facial-recognition/"
+
+upgrade=0
+replace=0
+if [[ -e /home/$user ]]; then
+  if [[ -e ${instdir} ]]; then
+    if [[ ! -e ${instdir}cat5tv.ver ]]; then
+      dialog --title "Error"\
+        --msgbox "\n${instdir} already exists, but is either not created by Pinecraft or is from a failed installation.\n\nPlease move or remove the folder and try again." 12 50
+      clear
+      exit 0
+    else
+
+      exec 3>&1
+      result=$(dialog --title "Pinecraft $thisver" \
+         --menu "Pinecraft is already installed:" 9 40 4 \
+         "U"       "Upgrade Software (Keep World)" \
+         "R"       "Remove Previous and Reinstall" \
+        2>&1 1>&3);
+
+      if [[ $? == 0 ]]; then
+        case $result in
+          U)
+            upgrade=1
+            ;;
+          R)
+            dialog --title "Confirmation"  --yesno "\nThis will remove your entire previous installation, including your world files.\n\nContinue?" 12 50
+            case $? in
+              1)
+              echo
+              echo
+              echo "Aborted."
+              echo
+              exit 1 ;;
+            esac
+            replace=1
+            ;;
+          esac
+        else
+          echo
+          echo
+          echo "Aborted."
+          echo
+          exit 1
+        fi
+
+    fi
+  fi
+else
+  echo "Aborting: $user does not have a homedir."
+  exit 1
+fi
+
+
+
+# Get the level seed, but only if this is a new install
+if [[ $upgrade == 0 ]]; then
+  exec 3>&1
+  result=$(dialog --title "Pinecraft $thisver" \
+         --menu "Choose your game seed:" 20 50 10 \
+         "A"       "Random (Default, ${mcver})" \
+         "B"       "Custom (${mcver})" \
+         "C"       "Category5 TV RPi Server (1.16.5)" \
+         "D"       "Jeff's Tutorial World (1.16.5)" \
+         "E"       "Minecraft Title Screen (1.9.4)" \
+         "F"       "Slime Farm (1.16.5)" \
+         "G"       "Obsidian Farm (1.9.4)" \
+         "H"       "Woodland Mansion (1.12.2)" \
+         "I"       "Triple Island Ocean Monument (1.14.4)" \
+         "J"       "Spruce Village and Coral Reef (1.14.4)" \
+         "K"       "Shipwreck Village (1.14.4)" \
+         "L"       "Underwater Temple (1.9.4)" \
+         "M"       "Diamond Paradise (1.9.4)" \
+         "N"       "All Biome World (1.12.2)" \
+         "O"       "Paradise Valley (1.16.5)" \
+       2>&1 1>&3);
+
+  if [[ $? == 0 ]]; then
+    case $result in
+    A)
+      seed=""
+      mcverANY=1
+      ;;
+    B)
+      seed="custom"
+      mcverANY=1
+      ;;
+    C)
+      seed="-4385290424787160722"
+      mcver="1.16.5"
+      ;;
+    D)
+      seed="6421417242871949536"
+      mcver="1.16.5"
+      ;;
+    E)
+      seed="2151901553968352745"
+      mcver="1.9.4" # Was actually part of 1.7.3 but that was a beta client, and Spigot only goes back to 1.9. Probably not usable?
+      ;;
+    F)
+      seed="7000"
+      mcver="1.16.5"
+      ;;
+    G)
+      seed="-8880302588844065321"
+      mcver="1.9.4" # Originally on 1.9
+      ;;
+    H)
+      seed="throwlow"
+      mcver="1.12.2" # Originally on 1.12
+      ;;
+    I)
+      seed="6073041046072376055"
+      mcver="1.14.4" # OP didn't say what version, so I have to guess
+      ;;
+    J)
+      seed="673900667"
+      mcver="1.14.4"
+      ;;
+    K)
+      seed="-613756530319979507"
+      mcver="1.14.4"
+      ;;
+    L)
+      seed="-5181140359215069925"
+      mcver="1.9.4" # Was on 1.8 but Spigot only goes back to 1.9
+      ;;
+    M)
+      seed="1785852800490497919"
+      mcver="1.9.4" # Was on 1.8 but Spigot only goes back to 1.9
+      ;;
+    N)
+      seed="1083719637794"
+      mcver="1.12.2"
+      ;;
+    O)
+      seed="4725084288293652062"
+      mcver="1.16.5"
+      ;;
+
+    esac
+  else
+    echo
+    echo
+    echo "Aborted."
+    echo
+    exit 1
+  fi
+
+  # Input custom seed
+  if [[ $seed == "custom" ]]; then
+    seed=$(dialog --stdout --title "Custom World Seed" \
+      --inputbox "Enter your custom world seed" 8 50)
+  fi
+
+fi
+
+
+# https://www.minecraft.net/en-us/download/server
+if [[ $mcver == "1.17.1" ]]; then
+  vanilla="https://launcher.mojang.com/v1/objects/a16d67e5807f57fc4e550299cf20226194497dc2/server.jar"
+elif [[ $mcver == "1.17" ]]; then
+  # 1.17
+  vanilla="https://launcher.mojang.com/v1/objects/0a269b5f2c5b93b1712d0f5dc43b6182b9ab254e/server.jar"
+else
+  # 1.16.5
+  vanilla="https://launcher.mojang.com/v1/objects/1b557e7b033b583cd9f66746b7a9ab1ec1673ced/server.jar"
+fi
+flavor=""
+
+
+declare -a flavors=()
+
+# Supports 1.14+
+if [[ $mcverANY == "1" ]] || [ $(version $mcver) -ge $(version "1.14.0") ]; then
+  flavors+=("F" "Fabric (Default, ${mcver})")
+fi
+
+if [[ $mcverANY == "1" ]] || [[ $mcver == "1.17.1" ]] || [[ $mcver == "1.17" ]] || [[ $mcver == "1.16.5" ]]; then
+  flavors+=("P" "Paper (${mcver})")
+fi
+
+if [[ $mcverANY == "1" ]] || [[ $mcver == "1.16.5" ]]; then
+  flavors+=("R" "Forge (1.16.5)")
+fi
+
+# Supports 1.9+
+if [[ $mcverANY == "1" ]] || [ $(version $mcver) -ge $(version "1.9") ]; then
+  flavors+=("S" "Spigot (${mcver})")
+fi
+
+# 1.12 only
+if [[ $mcverANY == "1" ]] || [[ $mcver == "1.12.2" ]]; then
+  flavors+=("C" "Cuberite (1.12)")
+fi
+
+if [[ $mcverANY == "1" ]] || [[ $mcver == "1.17.1" ]] || [[ $mcver == "1.17" ]] || [[ $mcver == "1.16.5" ]]; then
+  flavors+=("V" "Vanilla (${mcver})")
+fi
+
+exec 3>&1
+result=$(dialog --title "Pinecraft $thisver" --menu "Choose your Minecraft server type:" 20 40 10 "${flavors[@]}" 2>&1 1>&3);
+
+if [[ $? == 0 ]]; then
+  case $result in
+    S)
+      flavor="Spigot"
+      url="https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar"
+      jarname="spigot-*.jar"
+      switches="--rev ${mcver}"
+      ;;
+    F)
+      # https://fabricmc.net/use/
+      flavor="Fabric"
+      url="https://maven.fabricmc.net/net/fabricmc/fabric-installer/0.7.4/fabric-installer-0.7.4.jar"
+      jarname="fabric-server-launch.jar"
+      switches="server -mcversion ${mcver} -downloadMinecraft"
+      ;;
+    R)
+      # https://files.minecraftforge.net/net/minecraftforge/forge/
+      flavor="Forge"
+      mcver="1.16.5" # 1.17 not yet available
+      url="https://maven.minecraftforge.net/net/minecraftforge/forge/1.16.5-36.1.0/forge-1.16.5-36.1.0-installer.jar"
+      jarname="forge-1.16.5-36.1.0.jar"
+      switches="--installServer ."
+      ;;
+    V)
+      flavor="Vanilla"
+      url=$vanilla
+      jarname="server.jar"
+      switches=""
+      ;;
+    P)
+      # https://papermc.io/downloads
+      flavor="Paper"
+      if [[ $mcver == "1.17.1" ]]; then
+        url="https://papermc.io/api/v2/projects/paper/versions/1.17.1/builds/100/downloads/paper-1.17.1-100.jar"
+      elif [[ $mcver == "1.17" ]]; then
+        url="https://papermc.io/api/v2/projects/paper/versions/1.17/builds/28/downloads/paper-1.17-28.jar"
+      else
+        url="https://papermc.io/api/v2/projects/paper/versions/1.16.5/builds/778/downloads/paper-1.16.5-778.jar"
+      fi
+      jarname="minecraft.jar"
+      switches=""
+      ;;
+    C)
+      flavor="Cuberite"
+      mcver="1.12" # Cuberite is a whole other beast
+      script="https://compile.cuberite.org"
+      executable="Cuberite"
+      compiler=1;
+      ;;
+    esac
+else
+  echo
+  echo
+  echo "Aborted."
+  echo
+  exit 1
+fi
+if [[ $flavor == "" ]]; then
+  echo
+  echo
+  echo "Aborted."
+  echo
+  exit 1
+fi
+
+
+exec 3>&1
+result=$(dialog --title "Pinecraft $thisver $mcver" \
+         --menu "Choose your game type:" 20 40 10 \
+         "S"       "Survival" \
+         "C"       "Creative" \
+       2>&1 1>&3);
+
+if [[ $? == 0 ]]; then
+  case $result in
+    S)
+      gamemode="survival"
+      ;;
+    C)
+      gamemode="creative"
+      ;;
+    esac
+else
+  echo
+  echo
+  echo "Aborted."
+  echo
+  exit 1
+fi
+
+
+
+dialog --title "End-User License Agreement"  --yesno "In order to proceed, you must read and accept the EULA at https://account.mojang.com/documents/minecraft_eula\n\nDo you accept the EULA?" 8 60
+
+  case $? in
+  0)
+   eula="accepted"
+   eula_stamp=$(date)
+   ;;
+  1)
+   echo
+   echo
+   echo "EULA not accepted. You are not permitted to install this software."
+   echo
+   exit 1 ;;
+  esac
+
+
+
+
+# Gather some info about your system which will be used to determine the config
+revision=$(cat /proc/cpuinfo | grep 'Revision' | awk '{print $3}')
+board="Unknown" # Default will be overridden if determined
+memtotal=$(cat /proc/meminfo | grep MemTotal | awk '{print $2}') # Amount of memory in KB
+memavail=$(cat /proc/meminfo | grep MemAvailable | awk '{print $2}') # Amount of memory in KB
+memvariance=$(($memtotal - $memavail)) # Figure out how much memory is being used so we can make dynamic decisions for this board
+mem=$(( (($memtotal - $memvariance) / 1024) - 518)) # Amount of memory in MB
+memreservation=$((($memavail * 20/100) / 1024)) # Reserve memory for system (Failure to do this will cause "Error occurred during initialization of VM")
+gamemem=$(($mem - $memreservation)) # Calculate how much memory we can give to the game server (in MB)
+gamememMIN=$((($mem * 80/100) - 1024)) # Figure a MINIMUM amount of memory to allocate
+# Seriously, if you have 100 GB RAM, we don't need more than 12 of it
+if (( $gamemem > 12000 )); then
+    gamemem=12288
+    gamememMIN=1500
+fi
+oc_volt=0
+oc_friendly="N/A"
+if (( $gamememMIN < 0 )); then
+  dialog --title "Error" \
+    --msgbox "
+YOU DON'T HAVE ENOUGH AVAILABLE RAM
+
+Your system shows only $((${memavail} / 1024))MB RAM available, but with the applications running you have only $mem MB RAM available for allocation, which doesn't leave enough for overhead. Typically I'd want to be able to allocate at least 2 GB RAM.
+
+Either you have other things running, or your board is simply not good enough to run a Minecraft server." 18 50
+   echo
+   echo
+   echo "Failed. Not enough memory available for Minecraft server."
+   echo
+   exit 0
+fi
+
+if
+   [[ "$revision" == *"a03111" ]] ||
+   [[ "$revision" == *"b03111" ]] ||
+   [[ "$revision" == *"b03112" ]] ||
+   [[ "$revision" == *"b03114" ]] ||
+   [[ "$revision" == *"c03111" ]] ||
+   [[ "$revision" == *"c03112" ]] ||
+   [[ "$revision" == *"c03114" ]] ||
+   [[ "$revision" == *"d03114" ]]; then
+     board='Raspberry Pi 4'
+     boardnum=1
+     oc_volt=4
+     oc_freq=1900
+     oc_friendly="1.9 GHz"
+elif [[ "$revision" == *"c03130" ]]; then
+  board='Raspberry Pi 400'
+  boardnum=2
+  oc_volt=6
+  oc_freq=2000
+  oc_friendly="2.0 GHz"
+fi
+
+if (( $gamemem > 3800 )); then
+  kernel=$(uname -a)
+  if [[ ! "$kernel" == *"amd64"* ]] && [[ ! "$kernel" == *"arm64"* ]] && [[ ! "$kernel" == *"aarch64"* ]] && [[ ! "$kernel" == *"x86_64"* ]]; then
+
+    dialog --title "Warning" \
+    --msgbox "
+WARNING: 32-Bit OS on 64-Bit Board!
+
+Upgrade your distro to 64-bit to use your RAM.
+
+Since you are only using a 32-bit OS, you cannot use more than 4 GB RAM for Minecraft. Abort and Upgrade." 13 50
+
+    gamemem=2500
+    gamememMIN=1500
+
+  fi
+else if (( $gamememMIN < 1024 )); then
+  dialog --title "Warning" --yesno "\nWARNING: Either you have other things running, or your board is simply not good enough to run a Minecraft server. It is recommended you abort. ONLY install this on a dedicated system with no desktop environment or other applications running.\n\nWould you like to ABORT?" 14 50
+  case $? in
+  0)
+   echo
+   echo
+   echo "Aborted."
+   echo
+   exit 1 ;;
+  esac
+fi
+fi
+
+dialog --title "Pinecraft $thisver"  --yesno "Automatically load the server on boot?" 6 60
+  case $? in
+  0)
+   cron=1
+   ;;
+  1)
+   cron=0
+   ;;
+  esac
+
+#dialog --title "Pinecraft $thisver"  --yesno "Install Pinecraft Settings Interface?" 6 60
+#  case $? in
+#  0)
+#   psi=1
+#   ;;
+#  1)
+#   psi=0
+#   ;;
+#  esac
+
+dialog --title "Information" \
+--msgbox "
+Detected Hardware:
+$board
+
+RAM to Allocate:
+${gamememMIN##*( )}MB - ${gamemem##*( )}MB
+
+Overclock To:
+$oc_friendly
+
+Server User:
+$user
+
+Server Version:
+$flavor $mcver ($gamemode)" 20 50
+
+if [[ ! $oc_volt == 0 ]]; then
+  dialog --title "Confirmation"  --yesno "\nI will be overwriting your /boot/config.txt file to overclock this ${board}. I am not responsible for damage to your system, and you do this at your own risk.\n\nContinue?" 12 50
+  case $? in
+  1)
+   echo
+   echo
+   echo "Aborted."
+   echo
+   exit 1 ;;
+  esac
+fi
+
+
+###############################################
+# Finished Asking Questions: Begin Installation
+###############################################
+
+if [[ $upgrade == 1 ]] || [[ $replace == 1 ]]; then
+  if [[ -e ${instdir}stop ]]; then
+    dialog --infobox "Stopping server..." 3 22 ;
+    su - $user -c "${instdir}stop" > /dev/null 2>&1
+  fi
+fi
+if [[ $replace == 1 ]]; then
+  dialog --infobox "Creating Backup in home folder..." 3 40 ;
+  tar -czvf ${instdir}../pinecraft_backup-$(date -d "today" +"%Y-%m-%d-%H-%M").tar.gz $instdir > /dev/null 2>&1
+  cd ${instdir}..
+  dialog --infobox "Removing Old Install..." 3 27 ;
+  rm -rf ${instdir}
+  sleep 2
+fi
+
+mkdir -p $instdir
+cd $instdir
+
+
+
+
+###############################################
+# Create the scripts
+###############################################
+
+dialog --infobox "Creating scripts..." 3 34 ; sleep 1
+
+# Create the run script
+echo '#!/bin/bash
+user=$(whoami); if [[ $user != "'${user}'" ]]; then echo "Cannot run as ${user} - expecting '${user}'"; exit; fi
+cd "$(dirname "$0")"' > ${instdir}server
+if [[ $flavor == "Cuberite" ]]; then
+  echo ${instdir}cuberite/Cuberite >> ${instdir}server
+else
+  echo "exec java -Xms${gamememMIN}M -Xmx${gamemem}M -jar `basename $jarfile` --nogui" >> ${instdir}server
+fi
+chmod +x ${instdir}server
+
+
+###############################################
+# /Create the scripts
+###############################################
+
+
+###############################################
+# Set User Permissions
+###############################################
+
+  # Set ownership to the user
+  chown -R $user:$user $instdir
+
+###############################################
+# /Set User Permissions
+###############################################
+
+
+
+###############################################
+# Tweak Server Configs
+###############################################
+
+if [[ -e ${instdir}server.properties ]]; then
+
+  dialog --infobox "Applying config..." 3 34 ; sleep 1
+  # These settings are my own defaults, so only do these during first install (not upgrade)
+  # Will not replace user-configured changes in the server.properties
+  if [[ $upgrade == 0 ]]; then
+
+    # Enable Query
+      # Change the value if it exists
+      /bin/sed -i '/enable-query=/c\enable-query=true' ${instdir}server.properties
+      # Add it if it doesn't exist
+      if ! grep -q "enable-query=" ${instdir}server.properties; then
+        echo "enable-query=true" >> ${instdir}server.properties
+      fi
+
+    # Set game difficulty to Normal (default is Easy, but we want at least SOME challenge)
+      # Change the value if it exists
+      /bin/sed -i '/difficulty=/c\difficulty=normal' ${instdir}server.properties
+      # Add it if it doesn't exist
+      if ! grep -q "difficulty=" ${instdir}server.properties; then
+        echo "difficulty=normal" >> ${instdir}server.properties
+      fi
+
+    # Set the view distance to something the Raspberry Pi can handle quite well
+      # Change the value if it exists
+      /bin/sed -i '/view-distance=/c\view-distance=7' ${instdir}server.properties
+      # Add it if it doesn't exist
+      if ! grep -q "view-distance=" ${instdir}server.properties; then
+        echo "view-distance=7" >> ${instdir}server.properties
+      fi
+
+    # Level Seed
+      # Change the value if it exists
+      /bin/sed -i "/level-seed=/c\level-seed=${seed}" ${instdir}server.properties
+      # Add it if it doesn't exist
+      if ! grep -q "level-seed=" ${instdir}server.properties; then
+        echo "level-seed=${seed}" >> ${instdir}server.properties
+      fi
+
+  fi
+
+  # These ones, however, are selected by the user, so we'll make these changes even if already installed
+
+    # Game Mode (User Selected During Install)
+      # Change the value if it exists
+      /bin/sed -i "/gamemode=/c\gamemode=${gamemode}" ${instdir}server.properties
+      # Add it if it doesn't exist
+      if ! grep -q "gamemode=" ${instdir}server.properties; then
+        echo "gamemode=${gamemode}" >> ${instdir}server.properties
+      fi
+
+fi
+
+###############################################
+# /Tweak Server Configs
+###############################################
+
+
+
+dialog --title "Success" --msgbox "\n$thistool installed." 8 50
+
+clear
+  echo
+  echo
+  echo "Installation complete."
+  echo
+  echo "Support The Project: https://patreon.com/Category5"
+  echo
+

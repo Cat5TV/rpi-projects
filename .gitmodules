@@ -1,0 +1,3 @@
+[submodule "pinecraft"]
+	path = pinecraft
+	url = https://github.com/Cat5TV/pinecraft
