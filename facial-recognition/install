@@ -194,19 +194,22 @@ systemctl restart dphys-swapfile
 sleep 3
 
 dialog --infobox "Installing face-recognition..." 3 34
-pip install face-recognition
+pip install face-recognition > /dev/null 2>&1
 
 dialog --infobox "Installing Image Processing Capabilities..." 3 47
-pip install imutils
-
+pip install imutils > /dev/null 2>&1
 
 
 # Cleanup the temporary files
 rm -rf $tmpdir
 
+instdir="/home/$user/Documents/facial-recognition/"
+
+echo "YOU MADE IT THIS FAR. HAVE SOME SCOTCH."
+
+
 exit
 
-instdir="/home/$user/Documents/facial-recognition/"
 
 upgrade=0
 replace=0
