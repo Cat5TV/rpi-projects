@@ -2,6 +2,8 @@
 
 # Code adapted from https://github.com/carolinedunn/facial_recognition
 
+print("Please wait...")
+
 # import the necessary packages
 from imutils.video import VideoStream
 from imutils.video import FPS
@@ -82,7 +84,7 @@ while True:
 			# will select first entry in the dictionary)
 			name = max(counts, key=counts.get)
 
-			#If someone in your dataset is identified, print their name on the screen
+			#If someone in your dataset is identified, greet them
 			if currentname != name:
 				currentname = name
 				print("Hello, "+currentname+".")
@@ -112,8 +114,8 @@ while True:
 
 # stop the timer and display FPS information
 fps.stop()
-print("[INFO] elasped time: {:.2f}".format(fps.elapsed()))
-print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
+print("[INFO] Elapsed time: {:.2f}".format(fps.elapsed()))
+print("[INFO] ~FPS: {:.2f}".format(fps.fps()))
 
 # do a bit of cleanup
 cv2.destroyAllWindows()
