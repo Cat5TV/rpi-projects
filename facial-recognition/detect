@@ -10,9 +10,9 @@ print("By Robbie Ferguson")
 print("https://Category5.TV\n")
 
 # import the necessary packages
-#from imutils.video import VideoStream
-#from imutils.video import FPS
-#import face_recognition, imutils, pickle, time, cv2
+from imutils.video import VideoStream
+from imutils.video import FPS
+import face_recognition, imutils, pickle, time, cv2
 from gtts import gTTS
 from pathlib import Path
 
