@@ -18,25 +18,25 @@ from pathlib import Path
 
 lang = "en"
 tld = "com.au"
-path = "/home/pi/Documents/dataset/audiocache/"
+path = "/home/pi/Documents/dataset/"
 greetings = ['Hello', 'Greetings', 'Salutations', 'Welcome back', 'Nice to see you']
 
-Path(path).mkdir(parents=True, exist_ok=True)
+Path(path+"audiocache").mkdir(parents=True, exist_ok=True)
 
 def speak():
 	hashobj = hashlib.md5(say.encode())
 	hash = hashobj.hexdigest()
 	filename = hash
 	filename += '.mp3'
-	cache = Path(path+filename)
+	cache = Path(path+"audiocache/"+filename)
 	if cache.is_file():
 #		print(f'Playing from cache...')
-		os.system(f'play -t mp3 {path+filename} > /dev/null 2>&1')
+		os.system(f'play -t mp3 {path+"audiocache/"+filename} > /dev/null 2>&1')
 	else:
 #		print(f'Playing from API...')
 		speech = gTTS(text=say, lang=lang, tld=tld)
-		speech.save(path+filename)
-		os.system(f'play -t mp3 {path+filename} > /dev/null 2>&1')
+		speech.save(path+"audiocache/"+filename)
+		os.system(f'play -t mp3 {path+"audiocache/"+filename} > /dev/null 2>&1')
 
 say = "Please wait."
 print(say)
@@ -56,8 +56,8 @@ say = "Loading encodings & face detector."
 print("[INFO] "+say)
 speak()
 
-pickle = Path(encodingsP)
-if pickle.is_file():
+picklefile = Path(encodingsP)
+if picklefile.is_file():
 	say = "Encodings found."
 	print("[INFO] Encodings found.")
 	speak()

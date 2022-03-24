@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 # Code adapted from https://github.com/carolinedunn/facial_recognition
 
 print("Please wait...")
@@ -7,10 +6,10 @@ print("Please wait...")
 from imutils import paths
 import cv2, sys, face_recognition, pickle, os, random
 
-person = sys.argv[1]
-
-if person == "":
-	print("You need to specify a name.")
+try:
+	person = sys.argv[1]
+except:
+	print("You need to specify a name. Usage: "+sys.argv[0]+" \"Name of User\"")
 	quit()
 
 mode = 0o755
@@ -44,9 +43,10 @@ while True:
         break
     elif k%256 == 32:
         # SPACE pressed
+        os.system(f'play -t mp3 {"sfx/camera_shutter.mp3"} > /dev/null 2>&1')
         img_name = path+person+"/image_{}.jpg".format(img_counter)
         cv2.imwrite(img_name, frame)
-        print("{} written!".format(img_name))+" ... "+random.choice(responses)
+        print("{} written!".format(img_name)+" ... "+random.choice(responses))
         img_counter += 1
 
 cam.release()
