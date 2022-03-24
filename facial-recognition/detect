@@ -1,29 +1,79 @@
 #!/usr/bin/env python
-
 # Code adapted from https://github.com/carolinedunn/facial_recognition
 
-print("Please wait...")
+import os
+import hashlib
+import random
+
+print("\nFacial Recognition System v1.0")
+print("By Robbie Ferguson")
+print("https://Category5.TV\n")
 
 # import the necessary packages
-from imutils.video import VideoStream
-from imutils.video import FPS
-import face_recognition, imutils, pickle, time, cv2
+#from imutils.video import VideoStream
+#from imutils.video import FPS
+#import face_recognition, imutils, pickle, time, cv2
+from gtts import gTTS
+from pathlib import Path
+
+lang = "en"
+tld = "com.au"
+path = "/home/pi/Documents/dataset/audiocache/"
+greetings = ['Hello', 'Greetings', 'Salutations', 'Welcome back', 'Nice to see you']
+
+Path(path).mkdir(parents=True, exist_ok=True)
+
+def speak():
+	hashobj = hashlib.md5(say.encode())
+	hash = hashobj.hexdigest()
+	filename = hash
+	filename += '.mp3'
+	cache = Path(path+filename)
+	if cache.is_file():
+#		print(f'Playing from cache...')
+		os.system(f'play -t mp3 {path+filename} > /dev/null 2>&1')
+	else:
+#		print(f'Playing from API...')
+		speech = gTTS(text=say, lang=lang, tld=tld)
+		speech.save(path+filename)
+		os.system(f'play -t mp3 {path+filename} > /dev/null 2>&1')
+
+say = "Please wait."
+print(say)
+speak()
 
 #Initialize 'currentname' to trigger only when a new person is identified.
 currentname = "unknown"
 #Determine faces from encodings.pickle file model created by adduser command.
-encodingsP = "/home/pi/Documents/dataset/encodings.pickle"
+encodingsP = path+"encodings.pickle"
+
 #use this xml file
 cascade = "frontalface.xml"
 
 # load the known faces and embeddings along with OpenCV's Haar
 # cascade for face detection
-print("[INFO] Loading encodings + face detector...")
+say = "Loading encodings & face detector."
+print("[INFO] "+say)
+speak()
+
+pickle = Path(encodingsP)
+if pickle.is_file():
+	say = "Encodings found."
+	print("[INFO] Encodings found.")
+	speak()
+else:
+	say = "Encodings not found. Please read the fucking manual."
+	print("[ERROR] Encodings not found.")
+	speak()
+	exit()
+
 data = pickle.loads(open(encodingsP, "rb").read())
 detector = cv2.CascadeClassifier(cascade)
 
 # initialize the video stream and allow the camera sensor to warm up
-print("[INFO] Starting video stream...")
+say = "Starting video stream."
+print("[INFO] "+say)
+speak()
 vs = VideoStream(src=0).start()
 #vs = VideoStream(usePiCamera=True).start()
 time.sleep(2.0)
@@ -87,7 +137,9 @@ while True:
 			#If someone in your dataset is identified, greet them
 			if currentname != name:
 				currentname = name
-				print("Hello, "+currentname+".")
+				say = random.choice(greetings)+" "+currentname+"."
+				print("[INFO] Detected: "+currentname)
+				speak()
 
 		# update the list of names
 		names.append(name)

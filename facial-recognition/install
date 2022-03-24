@@ -147,6 +147,9 @@ do
   fi
 done
 
+dialog --infobox "Installing speech capabilities..." 3 34
+pip install gtts > /dev/null 2>&1
+
 dialog --infobox "Temporarily increasing swap space..." 3 40
 /bin/sed -i '/CONF_SWAPSIZE=/c\CONF_SWAPSIZE=2048' /etc/dphys-swapfile
 systemctl restart dphys-swapfile
@@ -157,9 +160,15 @@ tmpdir=`mktemp -d -p /usr/src/`
 cd $tmpdir
 
 # Obtain OpenCV
-dialog --infobox "Downloading OpenCV Source..." 3 32
-git clone https://github.com/opencv/opencv.git > /dev/null 2>&1
-git clone https://github.com/opencv/opencv_contrib.git > /dev/null 2>&1
+#dialog --infobox "Downloading OpenCV Source..." 3 32
+#git clone https://github.com/opencv/opencv.git > /dev/null 2>&1
+#git clone https://github.com/opencv/opencv_contrib.git > /dev/null 2>&1
+wget --progress=dot -O opencv.zip https://github.com/opencv/opencv/archive/refs/tags/4.5.5.zip 2>&1 | stdbuf -o0 grep "%" | stdbuf -o0 sed -u -e "s,\.,,g" | stdbuf -o0 awk '{print $2}' | stdbuf -o0 sed -u -e "s,\%,,g" | dialog --gauge "Downloading OpenCV Source..." 10 100
+unzip opencv.zip
+mv opencv-4.5.5 opencv
+wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/refs/heads/4.x.zip | stdbuf -o0 grep "%" | stdbuf -o0 sed -u -e "s,\.,,g" | stdbuf -o0 awk '{print $2}' | stdbuf -o0 sed -u -e "s,\%,,g" | dialog --gauge "Downloading OpenCV Contrib..." 10 100
+unzip opencv_contrib.zip
+mv opencv_contrib-4.x opencv_contrib
 mkdir opencv/build
 cd opencv/build
 

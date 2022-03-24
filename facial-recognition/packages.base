@@ -30,3 +30,6 @@ libhdf5-103
 python3-dev
 python3-pip
 python3-numpy
+unzip
+sox
+libsox-fmt-mp3
