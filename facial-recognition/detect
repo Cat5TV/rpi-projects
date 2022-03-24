@@ -5,7 +5,7 @@ import os
 import hashlib
 import random
 
-print("\nFacial Recognition System v1.0")
+print("\nFacial Acquisition Response Technology v1.0")
 print("By Robbie Ferguson")
 print("https://Category5.TV\n")
 
@@ -38,8 +38,11 @@ def speak():
 		speech.save(path+"audiocache/"+filename)
 		os.system(f'play -t mp3 {path+"audiocache/"+filename} > /dev/null 2>&1')
 
-say = "Please wait."
-print(say)
+print(f'Please wait...')
+say = "Welcome to FART"
+speak()
+os.system(f'play -t mp3 sfx/fart01.mp3 > /dev/null 2>&1')
+say = "Facial Acquisition Response Technology. Please wait."
 speak()
 
 #Initialize 'currentname' to trigger only when a new person is identified.
